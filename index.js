@@ -1,4 +1,8 @@
 const Alexa = require("ask-sdk");
+const doc = require("dynamodb-doc");
+const dynamo = new doc.DynamoDB();
+
+const tableName = "biscuitDatabase";
 
 const LaunchRequestHandler = {
   canHandle(handlerInput) {
@@ -22,15 +26,75 @@ const addToList = {
       handlerInput.requestEnvelope.request.intent.name === "addToList"
     );
   },
-  handle(handlerInput) {
-    const personName =
+  async handle(handlerInput) {
+    const person =
       handlerInput.requestEnvelope.request.intent.slots.personName.value;
-    const speechText = `${personName} has been added to the biscuit list.`;
+    var params = {
+      Key: {
+        personName: person,
+      },
+      TableName: tableName,
+    };
+
+    var result = await dynamo.getItem(params).promise();
+    let data = Object.values(result);
+    let output = await data[0].favourite;
+
+    const speechText = `${output} is ${person}'s favourite biscuit.`;
     const repromptText = "Can you repeat that please.";
     return handlerInput.responseBuilder
       .speak(speechText)
       .reprompt(repromptText)
       .withSimpleCard("The biscuit list got longer:", speechText)
+      .getResponse();
+  },
+};
+
+const turnToBuy = {
+  canHandle(handlerInput) {
+    return (
+      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
+      handlerInput.requestEnvelope.request.intent.name === "turnToBuy"
+    );
+  },
+  async handle(handlerInput) {
+    const speechText = "it's robbie's turn";
+    const repromptText = "Can you repeat that please.";
+    return handlerInput.responseBuilder
+      .speak(speechText)
+      .reprompt(repromptText)
+      .withSimpleCard("Who buy da biscuits?", speechText)
+      .getResponse();
+  },
+};
+
+const favouriteBiscuit = {
+  canHandle(handlerInput) {
+    return (
+      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
+      handlerInput.requestEnvelope.request.intent.name === "favouriteBiscuit"
+    );
+  },
+  async handle(handlerInput) {
+    const person =
+      handlerInput.requestEnvelope.request.intent.slots.personName.value;
+    var params = {
+      Key: {
+        personName: person,
+      },
+      TableName: tableName,
+    };
+
+    var result = await dynamo.getItem(params).promise();
+    let data = Object.values(result);
+    let output = await data[0].favourite;
+
+    const speechText = `${output} is ${person}'s favourite biscuit.`;
+    const repromptText = "Can you repeat that please.";
+    return handlerInput.responseBuilder
+      .speak(speechText)
+      .reprompt(repromptText)
+      .withSimpleCard("Yummy!", speechText)
       .getResponse();
   },
 };
@@ -108,6 +172,8 @@ exports.handler = async function (event, context) {
       .addRequestHandlers(
         LaunchRequestHandler,
         addToList,
+        turnToBuy,
+        favouriteBiscuit,
         HelpIntentHandler,
         CancelAndStopIntentHandler,
         SessionEndedRequestHandler
