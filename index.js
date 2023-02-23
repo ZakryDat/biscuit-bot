@@ -29,23 +29,126 @@ const addToList = {
   async handle(handlerInput) {
     const person =
       handlerInput.requestEnvelope.request.intent.slots.personName.value;
+
+    const sessionAttributes =
+      handlerInput.attributesManager.getSessionAttributes();
+    sessionAttributes.person = person;
+    handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+
     var params = {
-      Key: {
-        personName: person,
-      },
       TableName: tableName,
+      Item: {
+        personName: person,
+        purchased: 0,
+        favourite: "",
+      },
+      ConditionExpression: "attribute_not_exists(personName)",
     };
 
-    var result = await dynamo.getItem(params).promise();
-    let data = Object.values(result);
-    let output = await data[0].favourite;
+    try {
+      let response = await dynamo.putItem(params).promise();
+      console.log("response from putItem received");
+      console.log(response);
+    } catch (err) {
+      console.log("error: ", err);
+    }
 
-    const speechText = `${output} is ${person}'s favourite biscuit.`;
+    const speechText = `${person} was added to the biscuit list. What is their favourite biscuit?`;
     const repromptText = "Can you repeat that please.";
     return handlerInput.responseBuilder
       .speak(speechText)
       .reprompt(repromptText)
       .withSimpleCard("The biscuit list got longer:", speechText)
+      .getResponse();
+  },
+};
+
+const addFavourite = {
+  canHandle(handlerInput) {
+    return (
+      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
+      handlerInput.requestEnvelope.request.intent.name === "addFavourite"
+    );
+  },
+  async handle(handlerInput) {
+    let person;
+    if (handlerInput.requestEnvelope.request.intent.slots.personName) {
+      person =
+        handlerInput.requestEnvelope.request.intent.slots.personName.value;
+    } else {
+      const sessionAttributes =
+        handlerInput.attributesManager.getSessionAttributes();
+      person = sessionAttributes.person;
+    }
+
+    const biscuit =
+      handlerInput.requestEnvelope.request.intent.slots.biscuit.value;
+
+    var params = {
+      TableName: tableName,
+      Key: {
+        personName: person,
+      },
+      UpdateExpression: "set favourite = :newFavourite",
+      ExpressionAttributeValues: {
+        ":newFavourite": biscuit,
+      },
+    };
+
+    try {
+      let response = await dynamo.updateItem(params).promise();
+      console.log("response from update received");
+      console.log(response);
+    } catch (err) {
+      console.log("error: ", err);
+    }
+
+    const speechText = `${person}'s favourite biscuit has been set to ${biscuit}`;
+    const repromptText = "Can you repeat that please.";
+    return handlerInput.responseBuilder
+      .speak(speechText)
+      .reprompt(repromptText)
+      .withSimpleCard("Who buy da biscuits?", speechText)
+      .getResponse();
+  },
+};
+
+const addPurchase = {
+  canHandle(handlerInput) {
+    return (
+      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
+      handlerInput.requestEnvelope.request.intent.name === "addPurchase"
+    );
+  },
+  async handle(handlerInput) {
+    const person =
+      handlerInput.requestEnvelope.request.intent.slots.personName.value;
+
+    var params = {
+      TableName: tableName,
+      Key: {
+        personName: person,
+      },
+      UpdateExpression: "set purchased = purchased + :val",
+      ExpressionAttributeValues: {
+        ":val": 1,
+      },
+    };
+
+    try {
+      let response = await dynamo.updateItem(params).promise();
+      console.log("response from update received");
+      console.log(response);
+    } catch (err) {
+      console.log("error: ", err);
+    }
+
+    const speechText = `${person}'s biscuit tally has been updated.`;
+    const repromptText = "Can you repeat that please.";
+    return handlerInput.responseBuilder
+      .speak(speechText)
+      .reprompt(repromptText)
+      .withSimpleCard("Biscuits bought!", speechText)
       .getResponse();
   },
 };
@@ -58,7 +161,17 @@ const turnToBuy = {
     );
   },
   async handle(handlerInput) {
-    const speechText = "it's robbie's turn";
+    var params = {
+      TableName: tableName,
+      ProjectionExpression: "personName, purchased",
+    };
+
+    var result = await dynamo.scan(params).promise();
+    let data = Object.values(result);
+
+    console.log(data);
+
+    const speechText = `It's ${person} turn`;
     const repromptText = "Can you repeat that please.";
     return handlerInput.responseBuilder
       .speak(speechText)
@@ -75,9 +188,11 @@ const favouriteBiscuit = {
       handlerInput.requestEnvelope.request.intent.name === "favouriteBiscuit"
     );
   },
+
   async handle(handlerInput) {
     const person =
       handlerInput.requestEnvelope.request.intent.slots.personName.value;
+
     var params = {
       Key: {
         personName: person,
@@ -128,11 +243,11 @@ const CancelAndStopIntentHandler = {
     );
   },
   handle(handlerInput) {
-    const speechText = "Come back for more, labrador!";
+    const speechText = "Dipping out so soon?";
 
     return handlerInput.responseBuilder
       .speak(speechText)
-      .withSimpleCard("Chow chow", speechText)
+      .withSimpleCard("Bye bye.", speechText)
       .withShouldEndSession(true)
       .getResponse();
   },
@@ -174,6 +289,8 @@ exports.handler = async function (event, context) {
         addToList,
         turnToBuy,
         favouriteBiscuit,
+        addPurchase,
+        addFavourite,
         HelpIntentHandler,
         CancelAndStopIntentHandler,
         SessionEndedRequestHandler
