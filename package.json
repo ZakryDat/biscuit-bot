@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aws-sdk": "^2.10.0",
+    "ask-sdk": "^2.12.1",
     "dynamodb-doc": "^1.0.0"
   }
 }

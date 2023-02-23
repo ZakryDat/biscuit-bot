@@ -169,7 +169,13 @@ const turnToBuy = {
     var result = await dynamo.scan(params).promise();
     let data = Object.values(result);
 
-    console.log(data);
+    let sortedData = data[0].sort((a, b) => {
+      return a.purchased - b.purchased;
+    });
+
+    console.log(sortedData);
+
+    const person = sortedData[0].personName;
 
     const speechText = `It's ${person} turn`;
     const repromptText = "Can you repeat that please.";
