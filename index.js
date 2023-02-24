@@ -2,7 +2,40 @@ const Alexa = require("ask-sdk");
 const doc = require("dynamodb-doc");
 const dynamo = new doc.DynamoDB();
 
+const openAIKey = "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";
+
 const tableName = "biscuitDatabase";
+
+async function openAICall(promptName, promptBiscuit) {
+  let prompt = `Write a funny and creative limerick about ${promptName}'s favourite biscuit: ${promptBiscuit}.`;
+
+  const url = "https://api.openai.com/v1/completions";
+  const params = {
+    model: "text-davinci-003",
+    prompt: prompt,
+    temperature: 0.7,
+    max_tokens: 200,
+    frequency_penalty: 1.0,
+  };
+  const headers = {
+    Accept: "application/json",
+    Authorization: `Bearer ${openAIKey}`,
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      body: JSON.stringify(params),
+      headers: headers,
+    });
+    const responseJson = await response.json();
+    //output = `${prompt}${response.choices[0].text}`;
+    return responseJson.choices[0].text;
+  } catch (err) {
+    console.log(err);
+  }
+}
 
 const LaunchRequestHandler = {
   canHandle(handlerInput) {
@@ -30,11 +63,6 @@ const addToList = {
     const person =
       handlerInput.requestEnvelope.request.intent.slots.personName.value;
 
-    const sessionAttributes =
-      handlerInput.attributesManager.getSessionAttributes();
-    sessionAttributes.person = person;
-    handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
-
     var params = {
       TableName: tableName,
       Item: {
@@ -45,15 +73,16 @@ const addToList = {
       ConditionExpression: "attribute_not_exists(personName)",
     };
 
+    let speechText;
     try {
       let response = await dynamo.putItem(params).promise();
-      console.log("response from putItem received");
       console.log(response);
+      speechText = `${person} was added to the biscuit list. What is their favourite biscuit?`;
     } catch (err) {
       console.log("error: ", err);
+      speechText = `${person} is already in the biscuit list.`;
     }
 
-    const speechText = `${person} was added to the biscuit list. What is their favourite biscuit?`;
     const repromptText = "Can you repeat that please.";
     return handlerInput.responseBuilder
       .speak(speechText)
@@ -71,15 +100,8 @@ const addFavourite = {
     );
   },
   async handle(handlerInput) {
-    let person;
-    if (handlerInput.requestEnvelope.request.intent.slots.personName) {
-      person =
-        handlerInput.requestEnvelope.request.intent.slots.personName.value;
-    } else {
-      const sessionAttributes =
-        handlerInput.attributesManager.getSessionAttributes();
-      person = sessionAttributes.person;
-    }
+    const person =
+      handlerInput.requestEnvelope.request.intent.slots.personName.value;
 
     const biscuit =
       handlerInput.requestEnvelope.request.intent.slots.biscuit.value;
@@ -177,7 +199,7 @@ const turnToBuy = {
 
     const person = sortedData[0].personName;
 
-    const speechText = `It's ${person} turn`;
+    const speechText = `It's ${person}'s turn`;
     const repromptText = "Can you repeat that please.";
     return handlerInput.responseBuilder
       .speak(speechText)
@@ -216,6 +238,62 @@ const favouriteBiscuit = {
       .speak(speechText)
       .reprompt(repromptText)
       .withSimpleCard("Yummy!", speechText)
+      .getResponse();
+  },
+};
+
+const jaffaCakes = {
+  canHandle(handlerInput) {
+    return (
+      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
+      handlerInput.requestEnvelope.request.intent.name === "jaffaCakes"
+    );
+  },
+
+  async handle(handlerInput) {
+    const speechText =
+      "McVities classify jaffa cakes as cake. In 1991 they had to defend this classification in court when the department for customs and excise ruled that jaffa cakes were biscuits partly covered in chocolate, so that McVities would have to pay V.A.T. on jaffa cakes. McVities appealed the decision and the court ruled in their favour. Jaffa cakes are therefore legally cakes, not biscuits. Now, don't mention Jaffa cakes to me ever again, or else.";
+    const repromptText = "Can you repeat that please.";
+    return handlerInput.responseBuilder
+      .speak(speechText)
+      .reprompt(repromptText)
+      .withSimpleCard("Warning!", speechText)
+      .getResponse();
+  },
+};
+
+const biscuitPoem = {
+  canHandle(handlerInput) {
+    return (
+      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
+      handlerInput.requestEnvelope.request.intent.name === "biscuitPoem"
+    );
+  },
+
+  async handle(handlerInput) {
+    const person =
+      handlerInput.requestEnvelope.request.intent.slots.personName.value;
+
+    var params = {
+      Key: {
+        personName: person,
+      },
+      TableName: tableName,
+    };
+
+    var result = await dynamo.getItem(params).promise();
+    let data = Object.values(result);
+    const favourite = await data[0].favourite;
+
+    const response = await openAICall(person, favourite);
+    console.log(response);
+
+    const speechText = response;
+    const repromptText = "Can you repeat that please.";
+    return handlerInput.responseBuilder
+      .speak(speechText)
+      .reprompt(repromptText)
+      .withSimpleCard("Warning!", speechText)
       .getResponse();
   },
 };
@@ -297,6 +375,8 @@ exports.handler = async function (event, context) {
         favouriteBiscuit,
         addPurchase,
         addFavourite,
+        jaffaCakes,
+        biscuitPoem,
         HelpIntentHandler,
         CancelAndStopIntentHandler,
         SessionEndedRequestHandler
