@@ -2,7 +2,8 @@ const Alexa = require("ask-sdk");
 const doc = require("dynamodb-doc");
 const dynamo = new doc.DynamoDB();
 
-const openAIKey = "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";
+const openAIKey = process.env.OPENAI_API_KEY;
+console.log(openAIKey);
 
 const tableName = "biscuitDatabase";
 
