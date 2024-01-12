@@ -1,11 +1,9 @@
-# biscuit-bot
-the final authority on all things biscuit-based.
+# Biscuitbot
 
-an alexa voice skill
+A fun, but unpolished and unfinished hack developing an alexa voice "skill"
+Created using the AWS developer console, lambda functions and a Dynamo database. Hits up OpenAI's Gpt3 for AI poem-writing.
 
-set up using the aws developer console, aws lambda functions and a dynamo database.
-also makes API calls to OpenAI's gpt3.
+Tagline: "The final authority on all things biscuit-based."
 
-users can be added to a list, can query the list, can find out each other's
-favourite biscuits, can ask for the bot to write a poem about a favourite biscuit
-and the bot will scold anyone who dares mention jaffa cakes
+Features: Users can be added to a database, can query the database, can find out other users'
+favourite biscuits, can work out whose turn it is to buy biscuits and can ask for the bot to write a poem about a favourite biscuit. Additionally, Biscuitbot will scold anyone who dares mention jaffa cakes.
